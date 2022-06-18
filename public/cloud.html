@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>云盘上传</title>
+</head>
+
+<body>
+    <h1>音乐云盘上传</h1>
+    用户名:
+    <input type="text" id="user">
+    <br> 密码:
+    <input type="password" id="password">
+    <br>
+    <input type="button" value="登录" onclick="login()" />
+    <br>
+    <input id="file" type="file" multiple />
+    <br> 音乐格式:
+    <input type="radio" name="musicFormat" value="mp3" id="mp3"><label for="mp3">mp3</label>
+    <input type="radio" name="musicFormat" value="flac" id="flac" checked="checked"><label for="flac">flac</label>
+    <br>
+    <input type="button" value="上传" onclick="clickUpload()" />
+    <input type="button" value="测试" onclick="test()" />
+    <br>
+    <input type="button" value="获取userid" onclick="getUserID()" />
+    <div id="info" class="info"></div>
+    <script src="https://cdn.jsdelivr.net/npm/axios@0.26.1/dist/axios.min.js"></script>
+    <script>
+        let phone = '' // 这里填手机号
+        let password = '' // 这里填密码
+            // const phone = '' // 这里填手机号
+            // const password = '' // 这里填密码
+        const fileUpdateTime = {}
+        let fileLength = 0
+        let cookieToken = ''
+            // main()
+            // login()
+            //cookieToken生成
+        async function login() {
+            const userphone = document.getElementById('user').value
+            const passwordnew = document.getElementById('password').value
+            if (document.getElementById('user').value && document.getElementById('password').value) {} else {
+                alert("手机号或密码为空")
+                return
+            }
+            // if (!phone || !password) {
+            //     const msg = '请设置你的手机号码和密码'
+            //     alert(msg)
+            //     throw new Error(msg)
+            //     return
+            // }
+            const res = await axios({
+                withCredentials: true,
+                url: `/login/cellphone?phone=${userphone}&password=${encodeURIComponent(passwordnew)}`,
+                // withCredentials: true, //关键
+            })
+            cookieToken = res.data.cookie
+            localStorage.setItem('cookie', cookieToken);
+            // localStorage.setItem('fuck', cookieToken)
+            console.log(cookieToken)
+            alert("登录成功")
+        }
+        //初始化文件
+        function main() {
+            //检测文件为空
+            if (!document.querySelector('input[type="file"]').files[0]) {
+                alert("上传文件为空!")
+                return
+            }
+            //获取文件格式
+            let musicFormatCheck = "mp3"
+            if (document.getElementById("mp3").checked) {
+                musicFormatCheck = "mp3"
+            }
+            if (document.getElementById("flac").checked) {
+                musicFormatCheck = "flac"
+            }
+            let currentIndx = 0
+            for (const item of document.querySelector('input[type="file"]').files) {
+                Object.defineProperty(item, 'name', {
+                    writable: true, //设置属性为可写
+                })
+                item.name = "song." + musicFormatCheck
+                console.log(item.name);
+                var formData = new FormData()
+                formData.append('songFile', item)
+                currentIndx += 1
+                upload(item, currentIndx)
+            }
+        }
+
+        function upload(file, currentIndx) {
+            var formData = new FormData()
+            formData.append('songFile', file)
+            axios({
+                method: 'post',
+                url: `/cloud?time=${Date.now()}&cookie=${cookieToken}`,
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+                data: formData,
+            }).then(res => {
+                console.log(`${file.name} 上传成功`)
+                if (currentIndx >= fileLength) {
+                    alert("上传完毕")
+                    console.log('上传完毕')
+                }
+            }).catch(async err => {
+                console.log(err)
+                console.log(fileUpdateTime)
+                fileUpdateTime[file.name] ? fileUpdateTime[file.name] += 1 : fileUpdateTime[file.name] = 1
+                if (fileUpdateTime[file.name] >= 4) {
+                    console.error(`丢，这首歌怎么都传不上：${file.name}`)
+                    return
+                } else {
+                    console.error(`${file.name} 失败 ${fileUpdateTime[file.name]} 次`)
+                }
+                // await login()
+                upload(file, currentIndx)
+            })
+        }
+
+        function clickUpload() {
+            //判断cookie状态
+            if (localStorage.getItem('cookie') == null) {
+                alert("没有cookieToken，请先登录")
+                return
+            } else {
+                cookieToken = localStorage.getItem('cookie')
+            }
+            //获取文件并下载
+            main()
+        }
+
+        function test() {
+            localStorage.setItem("test", "123")
+        }
+
+        function getUserID() {
+            getLoginStatus('')
+        }
+        async function getLoginStatus(cookie = '') {
+            if (localStorage.getItem('cookie') == null) {
+                alert("没有cookieToken，请先登录")
+                return
+            } else {
+                cookieToken = localStorage.getItem('cookie')
+            }
+            const res = await axios({
+                url: `/login/status?timerstamp=${Date.now()}`,
+                method: 'post',
+                data: {
+                    cookieToken,
+                },
+            })
+            var obj = res.data
+            var userId = obj.data.account.id
+            var userName = obj.data.account.nickname
+            var avatarUrl = obj.data.account.avatarUrl
+            console.log(obj.data.account.id)
+                // document.querySelector('#info').innerText = JSON.stringify(res.data, null, 2)
+        }
+    </script>
+</body>
+
+
+</html>
